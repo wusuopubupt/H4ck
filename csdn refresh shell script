@@ -1,0 +1,34 @@
+1.随机的
+-----------------------
+#!/bin/bash
+#refresh my blog
+CURL='/usr/bin/curl'
+BASEURL="http://blog.csdn.net/buptgshengod/article/details/"
+CURLARGS="-f -s -S -k"
+FILE="/tmp/refresh.log"
+id_arr=(24665011 24411095 24369829 24313239)
+for (( i=1; i<=8000; i=i+1 ))
+    do
+        j=$RANDOM%4
+        id=${id_arr[$j]}
+        $CURL $CURLARGS $BASEURL$id > $FILE
+done
+
+2.顺序读数组
+--------------------------
+
+#!/bin/bash
+#refresh my blog
+CURL='/usr/bin/curl'
+BASEURL="http://blog.csdn.net/wusuopubupt/article/details/"
+CURLARGS="-f -s -S -k"
+FILE="/tmp/null"
+id_arr=(1 2 3 4)
+for id in ${id_arr[@]}
+do
+    for (( i=1; i<=2000; i=i+1 ))
+    do
+    #   echo $BASEURL$id
+      	$CURL $CURLARGS $BASEURL$id > $FILE
+    done
+done

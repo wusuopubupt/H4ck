@@ -1,5 +1,5 @@
 {
-  "name": "Cookie Modifier",
+  "name": "Cookie Editor",
   "version": "1.0",
   "description": "chrome修改cookie的小工具",
   
@@ -13,7 +13,7 @@
   },
   "browser_action": {
     "default_icon": "icon16.png",
-    "default_title": "Cookie Modifier",
+    "default_title": "Cookie Editor",
 	"default_popup": "popup.html"
   },
    "manifest_version": 2

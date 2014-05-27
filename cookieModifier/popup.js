@@ -3,7 +3,7 @@
  * @file    :  popup.js
  * @author  :  d4sh wang
  * @mail    :  d4shman@gmail.com
- * @version :  0.9
+ * @version :  1.0
  * @date	:  2013-05-16
  *
  */
@@ -33,6 +33,7 @@ function set_cookie(cookie){
 	
 	//alert("set cookie:" + cookie);
 	ck = cookie.split(';');
+	var counter = 0;
 	for(i in ck){
 		c = ck[i].trim();
 		if(!c) continue;
@@ -44,8 +45,11 @@ function set_cookie(cookie){
 			'url': url,
 			'name': k,
 			'value': v,
+		}, function() {
+			get_cookie();
 		});
 	}
+	alert("Set cookie successfully!");
 }
 
 // get cookie
@@ -57,7 +61,6 @@ function get_cookie() {
 			value = cookie[i].value;
 			cookie_str += (name + "=" + value + ";\n");
 		}
-		//alert(cookie_str);
 		$('cookie').value = cookie_str;
 	})
 }

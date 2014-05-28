@@ -1,0 +1,51 @@
+一、自我介绍：
+
+  教育背景：2009-2013 北京邮电大学信息工程本科
+
+二、技术能力：
+
+1.1年工作经验，2年php开发经验
+  读过的书：《php和mysql web开发》、《PHP核心技术与最佳实践》、《构建高性能Web站点》
+
+2.掌握Linux下C编程，读过PHP源码的SAPI、TSRM、HashTable、zval、FastCGI部分。
+  有PHP拓展开发经验
+  读过的书：《The C Programming Language》、《Linux C一站式编程》、《Linux Programming For Beginner》、《深入理解PHP内核》
+  最近在读：《CS：APP》
+
+3.对OWASP top10有深入的理解，并通过自己搭建DVWA系统，逐个实战，理解其攻防原理。
+  读过的书：《白帽子讲Web安全》、《Web之困》、《精通脚本Hack》、《Metasploit渗透测试魔鬼训练营》（部分）
+ 
+
+4.Python技能：Gearman任务调度的worker用Python完成数据统计工作；自己写过Python的小爬虫
+  读过的书: 《简明Python教程》、《A Byte Of Python》、《Python标准库》
+
+5.数据库技能：有Mysql数据库和PostgreSQL（用于地理位置计算）的实战经验。
+  掌握Mysql数据库的性能优化方法。同时，学习过Mongodb，但无实战经验。
+  读过的书：《高性能Mysql》（部分）、《MongoDB权威指南》
+
+6.Linux技能：熟练Linux的操作，Vim重度患者，一年Gentoo下工作经验。能完成简单shell脚本。
+  读过的书：《鸟哥的Linux私房菜》、《Linux shell脚本攻略》
+
+7.JavaScript技能：熟悉JS的闭包、Prototype，熟练掌握jQuery。
+  读过的书：《Javascript权威指南》
+
+8.数据结构与算法：Jobdu会员，AC程序超过100道（增加ing）
+  读过的书：《编程之美》、《算法竞赛入门经典》
+
+9.Chrome拓展：
+    豆瓣FM歌词插件
+    Chrome Cookie修改器
+
+三、项目经验：
+/////////////   //////////////////
+
+四、个人亮点：
+
+1.wooyun白帽， id:wusuopubupt（为CSDN提交过CSRF漏洞，为北京邮电大学提交过SQL Injection漏洞）
+2.csdn博客，   id:wusuopubupt（博客访问超过18万，博客排名1729名，截止2014-05-28）
+3.Github/Stackoverflow,    id:wusuopubupt
+
+五、自我评价：
+
+相信《师说》里讲的“闻道有先后，术业有专攻”，我本科并非计算机专业，但是凭着计算机技术和黑客精神
+带给自己不竭的源动力，我不断学习，坚信有朝一日自己能成为中国Web领域的顶级开发者。

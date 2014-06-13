@@ -1,5 +1,10 @@
 #!/usr/bin/python
 
+"""
+Ref: 1.http://www.cnblogs.com/way_testlife/archive/2011/04/20/2022997.html
+     2.http://www.ruanyifeng.com/blog/2011/07/imgHash.txt
+    
+"""
 import glob
 import os
 import sys

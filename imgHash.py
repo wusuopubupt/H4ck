@@ -51,3 +51,4 @@ if __name__ == '__main__':
         if prog: print
         for f, ham in sorted(seq, key=lambda i: i[1]):
             print "%d\t%s" % (ham, f)
+

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.6)
 
-project(voyage_worker)
+project(YOUR_PROJECT_NAME)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug")
@@ -51,11 +51,11 @@ message(STATUS "CXX_FLAGS = " ${CMAKE_CXX_FLAGS} " " ${CMAKE_CXX_FLAGS_${BUILD_T
 #find_library(MY_LIBS libgearman.a libhiredis.a libzlib.a libmyprotocbuf-c.a)
 
 #aux_source_directory(./protobuf PROTOBUF_SOURCE)
-#add_executable(voyage_client_test gearman_client_test.c ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
+#add_executable(YOUR_TARGET1 one.c ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
 
-add_executable(voyage_worker_add_transaction add_transaction_list.c  ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
+add_executable(YOUR_TARGET2 two.c  ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
 
-add_executable(voyage_worker_delete_tid delete_tid.c ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
+add_executable(YOUR_TARGET3 three.c ../libev/ev.c ../libev/event.c ../utils.c ../json.c)
 
 include_directories(${CMAKE_SOURCE_DIR}/../)
 

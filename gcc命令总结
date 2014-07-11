@@ -1,0 +1,63 @@
+/*gcc 命令总结*/
+
+补充下gcc的知识，免得被大自然说编译原理不行..
+
+1、-o 参数
+
+参数说明： -o参数用来指定生成程序的名字
+
+gcc test.c 会编译出一个名为a.out的程序
+gcc test.c -o test 编译出一个名为test的程序
+
+2、-l参数和-L参数
+
+参数说明： -l参数就是用来指定程序要链接的库，-l参数紧接着就是库名，比如，我要链接到数学库，它的库名是m，它的库文件名是libm.so(一般放在/lib、/usr/lib或/usr/local/lib目录下)，很容易看出，把库文件名的头lib和尾.so去掉就是库名了
+
+放在/lib和/usr/lib和/usr/local/lib里的库直接用-l参数就能链接了，但如果库文件没放在这三个目录里，而是放在其他目录里，这时我们只用-l参数的话，链接还是会出错，出错信息大概是：“/usr/bin/ld: cannot find -lxxx”，也就是链接程序ld在那3个目录里找不到libxxx.so，这时另外一个参数-L就派上用场了，比如常用的X11的库，它在/usr/X11R6/lib目录下，我们编译时就要用-L/usr/X11R6/lib -lX11参数，-L参数跟着的是库文件所在的目录名。再比如我们把libtest.so放在/aaa/bbb/ccc目录下，那链接参数就是-L /aaa/bbb/ccc -ltest
+
+手工来写链接参数总是很麻烦的，还好很多库开发包提供了生成链接参数的程序，名字一般叫xxxx-config，一般放在/usr/bin目录下，比如, mysql的链接参数生成程序是mysql_config(注意下划线，这个比较特殊)，执行mysql_config --libs:
+
+-L/usr/lib/x86_64-linux-gnu -lmysqlclient -lpthread -lz -lm -lrt -ldl 
+
+这些就是mysql需要的链接参数，运行命令自动生成，多简单省事！
+
+xxx-config除了--libs参数外还有一个参数是--cflags用来生成头文件包含目录的，也就是-I参数，执行 mysql_config --cflags:
+
+-I/usr/include/mysql -DBIG_JOINS=1  -fno-strict-aliasing  -g
+
+这就是mysql需要的头文件包含目录
+
+
+现在的问题就是怎样用这些输出结果了，最直接的方法就是复制粘贴或者照抄，更好的办法是在编译命令行里加入这个`xxxx-config --libs --cflags`，比如编译一个mysql程序：gcc mysql.c `mysql_config --libs --cflags` 就OK了（我前几天的博客里提到过这个问题，^_^）
+
+3、-include和-I参数
+
+
+参数说明： -include用来包含头文件，但一般情况下包含头文件都在源码里用#include xxxxxx实现，-include参数很少用。
+		  -I参数是用来指定头文件目录，/usr/include目录一般是不用指定的，gcc知道去那里找，但是如果头文件不在/usr/include里我们就要用-I参数指定了，比如头文件放在/myinclude目录里，那编译命令行就要加上-I /myinclude参数了，如果不加你会得到一个"xxxx.h: No such file or directory"的错误。-I参数可以用相对路径，比如头文件在当前目录，可以用-I.来指定。上面我们提到的--cflags参数就是用来生成-I 参数的
+
+
+4、-O参数
+
+参数说明： 这是一个程序优化参数，一般用-O2就是，用来优化程序用的，比如gcc test.c -O2，优化得到的程序比没优化的要小，执行速度可能也有所提高
+
+
+5、-shared参数
+
+参数说明： 编译动态库时要用到，比如gcc -shared test.c -o libtest.so
+
+
+6、几个相关的环境变量（用cmake时需要）
+
+PKG_CONFIG_PATH：用来指定pkg-config用到的pc文件的路径，默认是/usr/lib/pkgconf
+ig，pc文件是文本文件，扩展名是.pc，里面定义开发包的安装路径，Libs参数和Cflags参数等等。
+CC：用来指定c编译器
+CXX：用来指定cxx编译器
+LIBS：跟上面的--libs作用差不多
+CFLAGS:跟上面的--cflags作用差不多
+CC，CXX，LIBS，CFLAGS手动编译时一般用不上，在做configure时有时用到，一般情况
+下不用管
+环境变量设定方法：export ENV_NAME=xxxxxxxxxxxxxxxxx
+
+7、参考：http://wenku.baidu.com/view/655f48b91a37f111f1855b36.html
+

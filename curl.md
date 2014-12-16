@@ -17,6 +17,7 @@ CURL命令总结
 4. 发送表单信息
 	4.1)、 GET方法：
 	curl example.com/add?a=1&b=2
+
 	4.2)、 POST方法：
 	curl --data "a=1&b=2" www.test.com/add
 	

@@ -105,5 +105,6 @@ if __name__ == '__main__':
     regex_str = r"(%s) - - \[(%s)/(%s)/(%s)\:(%s) [\S]+\] \"(%s) (%s) (%s)\" (%s) (%s) \"(%s)\" \"(%s)\" \"(%s)\" (%s) (%s) (%s) (%s) (%s) (%s) \"(%s)\" (%s)" % (remote_addr,  day, month, year, log_time, method, request, http_protocol, status, body_bytes_sent, http_referer, http_cookie, http_user_agent,request_time, http_x_bd_logid, http_x_bd_routerip, server_addr, upstream_addr, host, http_x_forwarded_for, others)
 
     nginx_log = '../data/nginx_access.log'
+
     parser = NginxLogParser(regex_str, nginx_log)
 

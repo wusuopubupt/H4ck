@@ -1,6 +1,8 @@
 #!/bin/bash
 # nginx log parser
 
+# refer: http://www.bencarpenter.co.uk/awk-for-apache-nginx-logs
+
 set +x
 
 
